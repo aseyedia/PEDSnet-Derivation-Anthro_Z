@@ -1,0 +1,4 @@
+person_id,time_of_birth,gender_concept_id,gender_name
+1,2007-12-25T00:00:00,8532,FEMALE
+2,2000-06-18T00:00:00,8507,MALE
+3,2008-12-15T00:00:00,8507,MALE
