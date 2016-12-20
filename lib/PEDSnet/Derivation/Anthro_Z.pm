@@ -99,10 +99,12 @@ sub z_meas_for_person {
 	$z_rec->{measurement_concept_id} = $z_info->{z_measurement_concept_id},
 	$z_rec->{measurement_type_concept_id} = $z_type_cid;
 	$z_rec->{value_as_number} = $z_val;
+	$z_rec->{operator_concept_id} ||= 4172703;
 	$z_rec->{unit_concept_id} = $z_unit_cid;
 	$z_rec->{unit_source_value} = $z_unit_sv;
 	$z_rec->{measurement_source_value} =
 	  "PEDSnet NHANES 2000 Z score computation v$VERSION";
+	$z_rec->{measurement_source_concept_id} = 0;
 	$z_rec->{value_source_value} =
 	  "person: $person->{person_id}, measurement: $m->{measurement_id}";
 	push @z_scores, $z_rec;
@@ -116,10 +118,12 @@ sub z_meas_for_person {
 	   measurement_time => $m->{measurement_time},
 	   measurement_type_concept_id => $z_type_cid,
 	   value_as_number => $z_val,
+	   operator_concept_id => $m->{operator_concept_id} || 4172703,
 	   unit_concept_id => $z_unit_cid,
 	   unit_source_value => $z_unit_sv,
 	   measurement_source_value =>
 	     "PEDSnet NHANES 2000 Z score computation v$VERSION",
+	   measurement_source_concept_id => 0,
 	   value_source_value =>
 	     "person: $person->{person_id}, measurement: $m->{measurement_id}"
 	};

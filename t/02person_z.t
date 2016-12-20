@@ -73,6 +73,8 @@ my $output = [
 	       value_as_number => 0.98,
 	       unit_concept_id => 0,
 	       unit_source_value => 'SD',
+	       operator_concept_id => 4172703,
+	       measurement_source_concept_id => 0,
 	       provider_id => 1,
 	       visit_occurrence_id => 1,
 	       measurement_source_value =>
@@ -89,6 +91,8 @@ my $output = [
 	       unit_concept_id => 0,
 	       unit_source_value => 'SD',
 	       value_as_number => -0.40,
+	       operator_concept_id => 4172703,
+	       measurement_source_concept_id => 0,
 	       provider_id => 2,
 	       visit_occurrence_id => 3,
 	       measurement_source_value =>
@@ -105,6 +109,8 @@ my $output = [
 	       value_as_number => -1.80,
 	       unit_concept_id => 0,
 	       unit_source_value => 'SD',
+	       operator_concept_id => 4172703,
+	       measurement_source_concept_id => 0,
 	       provider_id => 2,
 	       visit_occurrence_id => 3,
 	       measurement_source_value =>
@@ -165,9 +171,11 @@ is_deeply( $z_scores,
 	      measurement_time => '2015-09-05T14:42:14',
 	      unit_concept_id => 0,
 	      unit_source_value => 'SD',
+	      operator_concept_id => 4172703,
 	      value_as_number => 0.28,
 	      provider_id => 2,
 	      visit_occurrence_id => 3,
+	      measurement_source_concept_id => 0,
 	      measurement_source_value =>
 	       'PEDSnet NHANES 2000 Z score computation v' .
 	         $PEDSnet::Derivation::Anthro_Z::VERSION,
@@ -182,8 +190,10 @@ is_deeply( $z_scores,
 	      unit_concept_id => 0,
 	      unit_source_value => 'SD',
 	      value_as_number => -0.40,
+	      operator_concept_id => 4172703,
 	      provider_id => 2,
 	      visit_occurrence_id => 3,
+	      measurement_source_concept_id => 0,
 	      measurement_source_value =>
 	       'PEDSnet NHANES 2000 Z score computation v' .
 	         $PEDSnet::Derivation::Anthro_Z::VERSION,
