@@ -1,6 +1,4 @@
 #!perl
-#
-# $Id$
 
 use 5.024;
 use strict;
@@ -8,8 +6,7 @@ use warnings;
 
 package PEDSnet::Derivation::Anthro_Z;
 
-our($VERSION) = '0.03';
-our($REVISION) = '$Revision$' =~ /: (\d+)/ ? $1 : 0;
+our($VERSION) = '0.04';
 
 use Moo 2;
 
@@ -21,8 +18,48 @@ use Medical::Growth::NHANES_2000;
 extends 'PEDSnet::Derivation';
 with 'MooX::Role::Chatty';
 
+# Override default verbosity level - current MooX::Role::Chatty
+# default silences warnings.
+has '+verbose' => ( default => sub { -1; } );
+
+=head1 NAME
+
+PEDSnet::Derivation::Anthro_Z - Compute Z scores using Medical::Growth systems
+
+=head1 DESCRIPTION
+
+L<PEDSnet::Derivation::Anthro_Z> computes Z scores using measurement
+systems based on L<Medical::Growth>.  Generally, one new measurement
+record is created for each elibible input measurement.  Nearly all
+other specifics are determined by settings in
+L<PEDSnet::Derivation::Anthro_Z::Config>, or the implementation of the
+L<Medical::Growth> system used.
+
+Please note that L<PEDSnet::Derivation::Anthro_Z> will not populate
+C<measurement_id> in the records it writes.  This allows for the
+output table to populate it automaatically from a sequence or by a
+similar mechanism.  If not, the application code will need to do so.
+
+L<PEDSnet::Derivation::Anthro_Z> makes available the following methods:
+
+=head2 Methods
+
+=over 4
+
+=cut
+
 has '_pending_output' =>
   ( is => 'ro', required => 0, default => sub { [] });
+
+=item get_measure_class(I<$selectors>)
+
+Returns a handle for the measurement class found by
+L<Medical::Growth/measure_class_for> using the contents of the hash
+reference I<$selectors>.
+
+The implementation here caches results for speed.
+
+=cut
 
 sub get_measure_class {
   my($self, %selectors) = @_;
@@ -32,6 +69,16 @@ sub get_measure_class {
     eval { Medical::Growth::NHANES_2000->measure_class_for(%selectors) };
 }
 
+=item compute_z(I<$selectors>, I<$value>, I<$args>)
+
+Where I<$value> is a numeric measurement value (not a measurement
+record), compute and return the Z score using the measurement class
+found by L</get_measure_class> using I<$selectors>.  If present,
+I<$args> is a reference to an array of additional arguments to be
+passed after I<$value>.
+
+=cut
+
 sub compute_z {
   my($self, $type, $sex, $age, $value ) = @_;
   $self->get_measure_class( sex => $sex,
@@ -39,6 +86,37 @@ sub compute_z {
 			    measure => $type )->z_for_value($value, $age);
 }
 
+=item z_meas_for_person(I<$person_rec>, I<$meas_list>, I<$mc_map>)
+
+For the person whose data are in I<$person_rec>, construct Z score
+measurement records for each eligible measurement record in
+I<$meas_list>, usng I<$mc_map> as the mapping between
+C<measurement_concept_id>s and Z score derivations.  This
+implementation is relatively specific to anthropometrics, in that it
+is currently hard-coded to pass only the age as an index argument to
+the C<z_for_value> function ultimately responsible for the
+computation.
+
+The hash reference to which I<$person_rec> points must at least
+contain C<person_id>, and the person's date of birth, as one of
+C<dt_of_birth> (a L<DateTime>), C<time_of_birth> (a string parseable
+by L<Rose::DateTime::Util/parse_date>), or the base OMOP
+C<year_of_birth>, C<month_of_birth>, and C<day_of_birth> numeric
+values.  If C<dt_of_birth> wasn't already present, it will be added to
+I<$person_rec> for efficienct on subsequent calls.
+
+The I<$meas_list> argument must be an array reference, pointing to a
+list of measurement records, each of which is a hash reference with
+keys corresponding to the columns of the PEDSnet CDM C<measurement>
+table.  The I<$mc_map> argument must also be an array reference
+pointing to a list of has references as described in
+L<PEDSnet::Derivation::Anthro_Z/concept_id_map>.
+
+Returns a reference to a list of measurement records containing the Z
+scores.  If either I<$meas_list> or I<$mc_map> is missing or empty,
+returns nothing.
+
+=cut
 
 sub z_meas_for_person {
   my($self, $person, $meas, $cid_map) = @_;
@@ -143,6 +221,16 @@ sub z_meas_for_person {
 
 =item get_meas_for_person_qry
 
+Returns a L<Rose::DBx::CannedQuery::Glycosylated> prepared to retrieve
+from the source backend measurement records for the C<person_id>
+passed as a bind parameter value when executing the query.
+
+This implementation will construct the query to retrieve all records
+from L<PEDSnet::Derivation::Anthro_Z/input_measurement_table> whose
+C<person_id> matches the bind parameter value and
+C<measurement_concept_id> matches one of the IDs in
+L<PEDSnet::Derivation::Anthro_Z/concept_id_map>.
+
 =cut
 
 sub get_meas_for_person_qry {
@@ -159,8 +247,14 @@ sub get_meas_for_person_qry {
 
 =item save_meas_qry($rows_to_save)
 
+Returns a L<Rose::DBx::CannedQuery::Glycosylated> object containing a
+query that will save to the sink backend I<$chunk_size> measurement
+records.  The query will expect values for the measurement records as
+bind parameter values.
+
 =cut
 
+# TODO: Refactor into base class
 sub save_meas_qry {
   my( $self, $chunk_size ) = @_;
   my $sink = $self->sink_backend;
@@ -196,6 +290,16 @@ sub _save_zs {
   return scalar @$z_list;
 }
 
+=item flush_output
+
+Flush any pending output records to the sink backend.  In most cases,
+this is done for you automatically, but the method is public in case a
+subclass or application wants to flush manually in circumstances where
+it feels it's warranted.
+
+=cut
+
+# TODO: Refactor into base class
 sub flush_output {
   my $self = shift;
   my $pending = $self->_pending_output;
@@ -206,12 +310,27 @@ sub flush_output {
   }
 }
 
+
+=for Pod::Coverage DEMOLISH
+
+=cut
+
 sub DEMOLISH { shift->flush_output }
 
 =item process_person_chunk($persons)
 
+For each person record in the list referred to by I<$persons>, compute
+Z scores from measurement data in the source backend, and save results
+to the sink backend.  A person record is a hash reference, as
+described above in L</z_meas_for_person>.
+
+Returns the number of Z score records saved in scalar context, or in list
+context the number of Z score records saved followed by the number of
+persons having at least one Z score record saved.
+
 =cut
 
+# TODO: Refactor out into base class
 sub process_person_chunk {
   my( $self, $person_list ) = @_;
   my $get_qry = $self->get_meas_for_person_qry;
@@ -233,39 +352,16 @@ sub process_person_chunk {
   $saved;
 }
 
+=item generate_zs()
 
-sub person_list_qry {
-  my($self) = @_;
-  my $src = $self->src_backend;
-  my $config = $self->config;
+Using data from the L<PEDSnet::Derivation/config> attribute, compute
+Z scores for everyone.
 
-  # DBD::CSV has a hard time with explicit 3-table join
-  if (ref($src) =~ /:CSV/) {
-    my $ptab = $config->input_person_table;
-    $src->build_query(qq[SELECT DISTINCT person_id,
-                              time_of_birth,
-                              c.concept_name AS gender_name
-                         FROM ] . $config->input_person_table . q[ AS p,
-                         ] . $config->input_measurement_table . q[ AS m,
-		         concept AS c
-			 WHERE p.person_id = m.person_id 
-                         AND p.gender_concept_id = c.concept_id
-                         AND m.measurement_concept_id IN (] .
-	  	      join(', ', map { $_->{measurement_concept_id} }
-  		  	   $self->config->concept_id_map->@*) . q[)]);
-  }
-  else {
-    $src->build_query(q[SELECT DISTINCT p.person_id, p.time_of_birth,
-                            c.concept_name as gender_name
-                        FROM ] . $config->input_measurement_table . q[ m
-                        INNER JOIN ] . $config->input_person_table .
-	  	            q[ p on p.person_id = m.person_id
-                        LEFT JOIN concept c ON c.concept_id = p.gender_concept_id
-                        WHERE m.measurement_concept_id IN (] . 
-	  	      join(', ', map { $_->{measurement_concept_id} }
-  		  	   $self->config->concept_id_map->@*) . q[)]);
-  }
-}
+In scalar context, returns the number of records saved.  In list
+contest returns the number of records and the number of unique
+persons with at least one record derived.
+
+=cut
 
 sub generate_zs {
   my $self = shift;
@@ -304,81 +400,7 @@ sub generate_zs {
 
 __END__
 
-=head1 NAME
-
-PEDSnet::Derivation::Anthro_Z - blah blah blah
-
-=head1 SYNOPSIS
-
-  use PEDSnet::Derivation::Anthro_Z;
-  blah blah blah
-
-=head1 DESCRIPTION
-
-Blah blah blah.
-
-The following command line options are available:
-
-=head1 OPTIONS
-
-=over 4
-
-=item B<--help>
-
-Output a brief help message, then exit.
-
-=item B<--man>
-
-Output this documentation, then exit.
-
-=item B<--version>
-
-Output the program version, then exit.
-
-=back
-
-=head1 USE AS A MODULE
-
-Is encouraged.  This file can be included in a larger program using
-Perl's L<require> function.  It provides the following functions in the
-package B<Foo>:
-
-=head2 FUNCTIONS
-
-It helps to document these if you encourage use as a module.
-
-=over 4
-
-=back
-
-=head2 EXPORT
-
-None by default.
-
-=head1 SEE ALSO
-
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
-
-=head1 DIAGNOSTICS
-
-Any message produced by an included package, as well as
-
-=over 4
-
-=item B<EANY>
-
-Anything went wrong.
-
-=item B<Something to say here>
-
-A warning that something newsworthy happened.
+__END__
 
 =back
 
@@ -388,7 +410,7 @@ Are there, for certain, but have yet to be cataloged.
 
 =head1 VERSION
 
-version 0.01
+version 0.04
 
 =head1 AUTHOR
 
@@ -396,9 +418,13 @@ Charles Bailey <cbail@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2015 by Charles Bailey
+Copyright (C) 2016 by Charles Bailey
 
 This software may be used under the terms of the Artistic License or
 the GNU General Public License, as the user prefers.
+
+This code was written at the Children's Hospital of Philadelphia as
+part of L<PCORI|http://www.pcori.org>-funded work in the
+L<PEDSnet|http://www.pedsnet.org> Data Coordinating Center.
 
 =cut
