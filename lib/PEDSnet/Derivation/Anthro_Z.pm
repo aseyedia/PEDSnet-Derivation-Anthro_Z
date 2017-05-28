@@ -317,6 +317,80 @@ sub flush_output {
 
 sub DEMOLISH { shift->flush_output }
 
+# TODO: Refactor into base class
+has '_person_qry' => ( isa => InstanceOf['Rose::DBx::CannedQuery'], is => 'rwp',
+		       lazy => 1, builder => '_build_person_qry');
+
+# _get_person_qry
+# Returns an active and executed L<Rose::DBx::CannedQuery> object used
+# for fetching person records.  If any arguments are present, they are
+# passed to the query as bind parameter values for execution.
+#
+# Returns nothing if the query could not be constructed or executed.
+#
+# This exists as a separate method only to provide a means to get bind
+# parameters to the query, which a standard builder method cannot
+# accommodate. If you need to use bind parameters, you have to call
+# _get_person_qry yourself and pass the result to the
+# PEDSnet::Derivation::BMI constructor as the value of _person_qry.
+# If you can avoid this, consider it.  If you can't, consider wrapping
+# the constructor in a method that does this bookkeeping, so the user
+# doesn't need to.
+
+sub _get_person_qry {
+  my $self = shift;
+  my $pt_qry = $self->src_backend->build_query($self->config->person_finder_sql);
+  return unless $pt_qry && $pt_qry->execute(@_);
+
+  $pt_qry;
+}
+
+sub _build_person_qry { shift->_get_person_qry; }
+
+=item get_person_chunk($chunk)
+
+Returns a reference to an array of person records.  If I<$chunk> is
+present, specifies the desired number of records.  If it's not,
+defaults to L<PEDSnet::Derivation::Anthro_Z::Config/person_chunk_size>.
+
+This implementation fetches records as specified by
+L<PEDSnet::Derivation::Anthro_Z::Config/person_finder_sql>.  You are
+free to override this behavior in a subclass.  In particular, if you
+want to parallelize computation over a large source database,
+L</get_person_chunk> and
+L<PEDSnet::Derivation::Anthro_Z::Config/person_finder_sql> give you
+opportunities to point each process at a subset of persons.
+
+=cut
+
+#TODO: Refactor into base class
+sub get_person_chunk {
+  my $self = shift;
+  my $qry = $self->_person_qry;
+  my $chunk_size =  $self->config->person_chunk_size;
+  my $chunk =
+    $self->src_backend->fetch_chunk($self->_person_qry, $chunk_size);
+
+  # This ridiculous aside because DBD::CSV/SQL::Statement keeps
+  # the table alias in the key name and chokes if you try to
+  # provide attribute aliases in the query
+  if (@$chunk and join('', keys %{$chunk->[0]}) =~ /\./) {
+    my(@replace);
+    foreach my $k (keys %{ $chunk->[0]}) {
+      next unless $k =~ /\./;
+      my $nk = $k =~ s/.+\.//r;
+      push @replace, [ $k, $nk ];
+    }
+
+    foreach my $pair (@replace) {
+      my($k, $nk) = @$pair;
+      map { $_->{$nk} = $_->{$k}; delete $_->{$k} } @$chunk;
+    }
+  }
+
+  $chunk;
+}
+
 =item process_person_chunk($persons)
 
 For each person record in the list referred to by I<$persons>, compute
@@ -373,8 +447,7 @@ sub generate_zs {
   my($pt_qry, $chunk);
 
   $self->remark("Finding patients with measurements") if $verbose;
-  $pt_qry = $self->person_list_qry;
-  return unless $pt_qry->execute;
+  return unless $self->_get_person_qry;
 
   $self->remark("Starting computation") if $verbose;
   while ($chunk = $src->fetch_chunk($pt_qry, $chunk_size) and @$chunk) {

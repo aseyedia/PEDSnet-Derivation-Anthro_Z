@@ -35,7 +35,7 @@ The following attributes are defined for the Z score derivation process:
 =cut
 
 use Moo 2;
-use Types::Standard qw/ Maybe Bool Str Int ArrayRef HashRef /;
+use Types::Standard qw/ Maybe Bool Str Int ArrayRef HashRef Enum /;
 
 extends 'PEDSnet::Derivation::Config';
 
@@ -279,6 +279,81 @@ has 'output_chunk_size' =>
 sub build_output_chunk_size {
   shift->_build_config_param('output_chunk_size') // 1000;
 }
+
+=item sql_flavor
+
+Provides a hint about the complexity of SQL statement the source
+backend can handle.  A value of C<limited> indicates that the backend
+has limited range, as seen with C<DBD::CSV>, and queries should avoid
+constructs such as subselects or multiple joins.  A value of C<full>
+indicates that expressions such as these are ok.
+
+Defaults to C<limited>, which produces less efficient SQL in some
+case, but will work, albeit slowly, with a wider range of backends.
+
+=cut
+
+has 'sql_flavor' =>
+  ( isa => Enum[ qw/ limited full /], is => 'ro', required => 0, lazy => 1,
+    builder => 'build_sql_flavor' );
+
+sub build_sql_flavor { shift->_build_config_param('sql_flavor') // 'limited' }
+
+=item person_finder_sql
+
+A string of SQL to be used to select the C<person_id>s for whom Z
+scores should be computed.
+
+The default value finds persons who have one or more measurements with
+a C<measurement_concept_id> present in L</concept_id_map>.
+
+=cut
+
+has 'person_finder_sql' =>
+  ( isa => Str, is => 'ro', required => 1, lazy => 1,
+    builder => 'build_person_finder_sql' );
+
+sub build_person_finder_sql {
+  my $self = shift;
+
+  my $sql = $self->_build_config_param('person_finder_sql');
+  return $sql if $sql;
+
+  # DBD::CSV has a hard time with explicit 3-table join
+  # N.B. SQL::Statement requires capitalzation below
+  if ($self->sql_flavor eq 'limited') {
+    return q[select distinct p.person_id, p.time_of_birth,
+                             c.concept_name as gender_name
+             from ] . $self->input_person_table . q[ as p,
+               ] . $self->input_measurement_table . q[ as m,
+	       concept as c
+	     where p.person_id = m.person_id 
+               and p.gender_concept_id = c.concept_id
+               and m.measurement_concept_id IN (] .
+	  	 join(', ', map { $_->{measurement_concept_id} }
+		      $self->concept_id_map->@*) . q[)];
+  }
+  else {
+    return q[select distinct p.person_id, p.time_of_birth,
+                            c.concept_name as gender_name
+             from ] . $self->input_measurement_table . q[ m
+             inner join ] . $self->input_person_table .
+	       q[ p on p.person_id = m.person_id
+             left join concept c ON c.concept_id = p.gender_concept_id
+             where m.measurement_concept_id in (] . 
+	       join(', ', map { $_->{measurement_concept_id} }
+		    $self->concept_id_map->@*) . q[)];
+  }
+}
+
+=item person_chunk_size
+
+The number of C<person_id>s to retrieve at a time from the source
+backend in L<PEDSnet::Derivation::Anthro_Z/generate_zs>.
+
+Defaults to 1000.
+
+=cut
 
 has 'person_chunk_size' =>
   ( isa => Int, is => 'ro', required => 1, lazy => 1,

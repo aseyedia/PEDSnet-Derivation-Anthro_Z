@@ -47,19 +47,49 @@ if ($has_sqlite) {
   my $handle = PEDSnet::Derivation::Anthro_Z->new(src_backend => $backend,
 						  sink_backend => $backend,
 						  config => $config);
-  my $pq = eval {$handle->person_list_qry };
-  my $error = $@;
 
-  is($error, '', 'Create patient list query');
-  isa_ok($pq, 'Rose::DBx::CannedQuery', 'Retrieved query');
+  my $got_sql = lc $handle->config->person_finder_sql =~ s/\s+|\n//gr;
+  my $want_sql = lc
+    q[select distinct p.person_id, p.time_of_birth,
+                         c.concept_name as gender_name
+      from person_list_input m
+      inner join person_demo p on p.person_id = m.person_id
+      left join concept c ON c.concept_id = p.gender_concept_id
+      where m.measurement_concept_id in (3023540,3013762,3038553)]
+    =~ s/\s+|\n//gr;
+  is($got_sql, $want_sql, 'Default person finder SQL - full');
 
-  my $plist = eval { $pq->execute->fetchall_arrayref({}) };
+  my $plist = eval { $handle->get_person_chunk };
   is(scalar @$plist, 3, 'Patient count');
   is_deeply( [ grep { $_->{person_id} == 2 } @$plist ],
 	     [ { person_id => 2,
 	       time_of_birth => '2000-06-18T00:00:00',
 	       gender_name => 'MALE' } ],
 	     'Result contents');
+
+  $config = PEDSnet::Derivation::Anthro_Z::Config->
+    new(config_stems => [ Path::Tiny::path('anthro_z')->
+			  absolute($FindBin::Bin)->canonpath ]);
+  is($config->sql_flavor, 'limited', 'Default to limited SQL flavor');
+
+  $got_sql = lc $config->person_finder_sql =~ s/\s+|\n//gr;
+  $want_sql = lc
+    q[select distinct p.person_id, p.time_of_birth,
+                         c.concept_name as gender_name
+      from person as p, measurement as m, concept as c
+      where p.person_id = m.person_id 
+            and p.gender_concept_id = c.concept_id
+           and m.measurement_concept_id in (3023540,3013762,3038553,3001537)]
+    =~ s/\s+|\n//gr;
+  is($got_sql, $want_sql, 'Default person finder SQL - limited');
+
+  $config = PEDSnet::Derivation::Anthro_Z::Config->
+    new(config_stems => [ Path::Tiny::path('anthro_z_less')->
+			  absolute($FindBin::Bin)->canonpath ]);
+  is($config->person_finder_sql,
+     "select data from somewhere where it = 'good';",
+     'Custom person finder SQL');
+
 }
 
 done_testing;
