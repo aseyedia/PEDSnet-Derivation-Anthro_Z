@@ -162,6 +162,15 @@ sub build_concept_id_map {
       $map = [ $map ];
     }
   }
+
+  foreach my $m (@$map) {
+    if (exists $m->{z_score_info}->{z_check_callback} and
+	not ref $m->{z_score_info}->{z_check_callback}) {
+      $m->{z_score_info}->{z_check_callback} =
+	eval $m->{z_score_info}->{z_check_callback};
+    }
+  }
+
   $map;
 }
 

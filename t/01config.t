@@ -83,6 +83,7 @@ is_deeply($config->clone_attributes_except,
 is_deeply($config->concept_id_map,
 	  [ { measurement_concept_id => 3023540,
 	      z_score_info => {
+			       z_class_system => 'NHANES_2000',
 			       z_class_measure => "Height for Age",
 			       z_measurement_concept_id => 2000000042
 			      }
@@ -90,6 +91,7 @@ is_deeply($config->concept_id_map,
 	    {
 	     measurement_concept_id => 3013762,
 	     z_score_info => {
+			      z_class_system => 'NHANES_2000',
 			      z_class_measure => "Weight for Age",
 			      z_measurement_concept_id => 2000000041
 			     }
@@ -97,6 +99,7 @@ is_deeply($config->concept_id_map,
 	    {
 	     measurement_concept_id => 3038553,
 	     z_score_info => {
+			      z_class_system => 'NHANES_2000',
 			      z_class_measure => "BMI for Age",
 			      z_measurement_concept_id => 2000000043
 			     }
@@ -104,6 +107,7 @@ is_deeply($config->concept_id_map,
 	    {
 	     measurement_concept_id => 3001537,
 	     z_score_info => {
+			      z_class_system => 'NHANES_2000',
 			      z_class_measure => "HC for Age",
 			      z_measurement_concept_id => 2000000999
 			     }

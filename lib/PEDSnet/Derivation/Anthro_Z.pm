@@ -13,7 +13,7 @@ use Moo 2;
 use Rose::DateTime::Util qw( parse_date );
 use Types::Standard qw/InstanceOf Int HashRef/;
 
-use Medical::Growth::NHANES_2000;
+use Medical::Growth;
 
 extends 'PEDSnet::Derivation';
 with 'MooX::Role::Chatty';
@@ -62,11 +62,11 @@ The implementation here caches results for speed.
 =cut
 
 sub get_measure_class {
-  my($self, %selectors) = @_;
+  my($self, $selectors) = @_;
   state $cache = {};
-  my $key = join '|', %selectors;
+  my $key = join '|', %$selectors;
   $cache->{$key} //=
-    eval { Medical::Growth::NHANES_2000->measure_class_for(%selectors) };
+    eval { Medical::Growth->measure_class_for(%$selectors) };
 }
 
 =item compute_z(I<$selectors>, I<$value>, I<$args>)
@@ -80,10 +80,11 @@ passed after I<$value>.
 =cut
 
 sub compute_z {
-  my($self, $type, $sex, $age, $value ) = @_;
-  $self->get_measure_class( sex => $sex,
-			    age_group => $age,
-			    measure => $type )->z_for_value($value, $age);
+  my($self, $selectors, $value, $args ) = @_;
+  $args //= [];
+  my $mc = $self->get_measure_class( $selectors );
+  return unless $mc;
+  $mc->z_for_value($value, @$args);
 }
 
 =item z_meas_for_person(I<$person_rec>, I<$meas_list>, I<$mc_map>)
@@ -154,16 +155,19 @@ sub z_meas_for_person {
       $m->{measurement_dt} =
 	parse_date($m->{measurement_time} // $m->{measurement_date})
 	unless exists $m->{measurement_dt};
+
+      if (exists $z_info->{z_check_callback}) {
+	next unless $z_info->{z_check_callback}->($person, $m, $pair);
+      }
+
       my %age = $m->{measurement_dt}->delta_md($person->{dt_of_birth})->deltas;
       my $age_mo = $age{months} + $age{days} / 31;
-      my $mc =
-	$self->get_measure_class( measure => $z_info->{z_class_measure},
-				  age_group => ($age_mo < 24
-						? 'Infant' : 'Child'),
-				  sex => lc $person->{gender_name} );
-      next unless $mc;
-      my $z_val = $mc->z_for_value($m->{value_as_number}, $age_mo);
-
+      my $z_val = $self->compute_z({ system => $z_info->{z_class_system},
+				     measure => $z_info->{z_class_measure},
+				     age_group => ($age_mo < 24
+						   ? 'Infant' : 'Child'),
+				     sex => lc $person->{gender_name} },
+				   $m->{value_as_number}, [ $age_mo ]);
       $self->remark( sprintf 'Computed %s Z score %4.2f for meas %d on %s',
 		     $z_info->{z_class_measure}, $z_val,
 		     $m->{measurement_id}, $m->{measurement_time})
