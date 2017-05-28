@@ -132,7 +132,7 @@ sub z_meas_for_person {
   my $verbose = $self->verbose;
   my(@z_scores, @clone_except);
 
-  return unless $cid_map and @$cid_map;
+  return unless $meas and @$meas and $cid_map and @$cid_map;
 
   @clone_except = $conf->clone_attributes_except->@* if $clone;
 
