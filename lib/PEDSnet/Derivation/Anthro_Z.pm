@@ -136,7 +136,7 @@ sub z_meas_for_person {
 
   @clone_except = $conf->clone_attributes_except->@* if $clone;
 
-  $person->{dt_of_birth} =
+  $person->{dt_of_birth} //=
     parse_date($person->{time_of_birth} //
 	       join('-', map { $person->{$_} } qw/ year_of_birth
 						   month_of_birth
