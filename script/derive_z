@@ -1,0 +1,241 @@
+#!/usr/bin/env perl
+
+use 5.024;
+use strict;
+use warnings;
+
+=head1 NAME
+
+derive_z
+
+=head1 SYNOPSIS
+
+  ./derive_z z_test | tee z_test.log
+
+=head1 DESCRIPTION
+
+This is a simple application that makes use of
+L<PEDSnet::Derivation::Anthro_Z>.  It relies entirely on configuration
+file(s) for customization.  Command-line arguments are taken as
+configuration file I<stems> (i.e. path up to basename with no
+extension), relative to the current working directory.  It also looks
+for files in the current working directory with the same basename as
+this application or a basename of F<anthro_z>.
+
+In addition to the configuration items defined in
+L<PEDSnet::Derivation::Anthro_Z::Config>, the application uses a few
+additional configuration elements:
+
+=over 4
+
+=item src_rdb
+
+Describes the database connections to use for the source backend, in
+any of the formats accepted by
+L<rdb/PEDSnet::Derivation::Backend::RDB>. 
+
+=item sink_rdb
+
+Does the same for the sink backend.  If it's not present, L</src_rdb>
+is used again.
+
+=item output_ddl
+
+A SQL expression to be used to create the output measurement table in
+the sink backend.  Depending on your configuration file format, it may
+be easier to specify as a string (used directly), an array reference
+(concatenated into a string) or a hash reference (values concatenated
+into a string).
+
+If the output measurement table already exists, no attempt is made to
+recreate it.  If L</output_ddl> is the single word C<clone>, an
+attempt is made to clone the input measurement table's structure.
+
+=back
+
+=cut
+
+use Scalar::Util qw(reftype);
+use Path::Tiny;
+use PEDSnet::Derivation::Backend::RDB;
+use PEDSnet::Derivation::Anthro_Z;
+use PEDSnet::Derivation::Anthro_Z::Config;
+
+our $VERSION = '1.00';
+
+sub _setup_config {
+  my($stems, $section) = @_;
+  # Anchor relative to cwd here, because PEDSnet::Derivation::Config
+  # will anchor relative to the application.
+  $stems = [ map { path($_)->absolute } @$stems ] if $stems and @$stems;
+  PEDSnet::Derivation::Anthro_Z::Config->
+      new(config_stems => [ @$stems,
+			    path($0)->basename(qr/\.[^.]*$/),
+			    'bmi' ],
+	  (defined $section ? (config_section => $section) : ())
+	 );
+}
+
+sub _setup_backends {
+  my $conf = shift;
+
+  my $src_rdb = PEDSnet::Derivation::Backend::RDB->
+    new( rdb => $conf->config_datum('src_rdb'));
+
+  my $sink_rdb = $conf->config_datum('sink_rdb') ?
+    PEDSnet::Derivation::Backend::RDB->
+      new( rdb => $conf->config_datum('sink_rdb')) : $src_rdb;
+
+  unless ($sink_rdb->column_names( $conf->output_measurement_table )) {
+    if (my $ddl = $conf->config_datum('output_ddl')) {
+      $ddl = join ' ', @$ddl if reftype($ddl) eq 'ARRAY';
+      $ddl = join ' ', values %$ddl if reftype($ddl) eq 'HASH';
+
+      if ($ddl eq 'clone') {
+	if ($src_rdb eq $sink_rdb) {
+	  $sink_rdb->clone_table($conf->input_measurement_table,
+				 $conf->output_measurement_table);
+	}
+	else {
+	  die "Can't clone tables across different database backends";
+	}
+      }
+      else {
+	$sink_rdb->execute($sink_rdb->build_query($ddl))
+	  or die "Error executing DDL ($ddl)";
+      }
+    }
+    else {
+      die 'Table ' . $conf->output_measurement_table .
+	'not found, and no output_ddl specified';
+    }
+  }
+  ($src_rdb, $sink_rdb);
+}
+
+sub _run {
+  my($args, $opts) = @_;
+  $opts //= {};
+  my $conf = _setup_config($args, $opts->{section});
+  my($src_rdb, $sink_rdb) = _setup_backends($conf);
+  my $driver = PEDSnet::Derivation::Anthro_Z->
+    new(src_backend => $src_rdb, sink_backend => $sink_rdb,
+	config => $conf,
+	verbose => $opts->{verbose} // $conf->config_datum('verbose') // 1);
+
+  my($values, $persons) = $driver->generate_bmis;
+
+  $driver->remark({ level => 1,
+		    message => [ 'Saved %d Z scores for %d persons',
+				 $values, $persons ]});
+  return ($values, $persons) if wantarray;
+  return $values;
+}
+
+unless (caller) {
+  ## Begin code for standalone execution
+  require Getopt::Long;
+  my($help,$man, $version, $verbose, $section) = (0, 0, 0, 0, undef);
+    
+  unless (Getopt::Long::GetOptions(help => \$help, man => \$man,
+				   version => \$version,
+				   'section=s' => \$section,
+				   'verbose=i' => \$verbose)
+	  and not $help and not $man) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage( -verbose => ($man ? 2 : 0), -exitval => 1);
+  }
+  if ($version) {
+    print "$0 version $VERSION\n";
+    exit 0;
+  }
+
+  _run(\@ARGV, { section => $section, verbose => $verbose });
+}
+
+  
+__END__
+
+=head1 OPTIONS
+
+The following command line options are supported:
+
+=over 4
+
+=item B<--verbose=>I<n>
+
+Set the level of diagnostic messages to I<n>.  Higher numbers
+produce more detailed messages.
+
+The default is C<1>, which produces a message at major steps in
+processing.  This can be overriden by the the command line option, or
+by the configuration option C<verbose>, in that order.
+
+=item B<--section=>I<name>
+
+Specifies a section name for use in gathering configuration data
+(cf. L<PEDSnet::Derivation::Config/config_section>).
+
+=item B<--help>
+
+Output a brief help message, then exit.
+
+=item B<--man>
+
+Output this documentation, then exit.
+
+=item B<--version>
+
+Output the program version, then exit.
+
+=back
+
+=head1 DIAGNOSTICS
+
+Any message produced by an included package, as well as
+
+=over 4
+
+=item B<Table %s not found, and no output_ddl specified> (F)
+
+The output measurement table doesn't appear to exist, and you didn't
+provide an L</output_ddl> value.
+
+=item B<Error executing DDL (%s)> (F)
+
+The sink backend wasn't able to create the output measurement table
+using L</output_ddl>.
+
+=item B<Can't clone tables across different database backends> (F)
+
+You specified that the output measurement table should be cloned from
+the input measurement table but the two are in different backends.
+
+=back
+
+=head1 BUGS AND CAVEATS
+
+Are there, for certain, but have yet to be cataloged.
+
+=head1 VERSION
+
+version 1.00
+
+=head1 AUTHOR
+
+Charles Bailey <cbail@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2017 by Charles Bailey
+
+This software may be used under the terms of the Artistic License or
+the GNU General Public License, as the user prefers.
+
+This code was written at the Children's Hospital of Philadelphia as
+part of L<PCORI|http://www.pcori.org>-funded work in the
+L<PEDSnet|http://www.pedsnet.org> Data Coordinating Center.
+
+=cut
+
+
