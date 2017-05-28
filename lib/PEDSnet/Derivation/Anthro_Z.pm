@@ -413,7 +413,8 @@ sub process_person_chunk {
   my( $self, $person_list ) = @_;
   my $get_qry = $self->get_meas_for_person_qry;
   my $src = $self->src_backend;
-  my $saved = 0;
+  my $saved_rec = 0;
+  my(%saved_pers);
 
   foreach my $p ($person_list->@*) {
     next unless $src->execute($get_qry, [ $p->{person_id} ]);
@@ -423,11 +424,14 @@ sub process_person_chunk {
     # number of input measurements
     while (my @rows = $src->fetch_chunk($get_qry)->@*) { push @anthro, @rows }
     
-    $saved += $self->_save_zs($self->z_meas_for_person($p, \@anthro));
-
+    if (my $zs = $self->z_meas_for_person($p, \@anthro)) {
+      $saved_pers{ $p->{person_id} }++;
+      $saved_rec += $self->_save_zs($zs);
+    }
   }
 
-  $saved;
+  return ($saved_rec, scalar keys %saved_pers) if wantarray;
+  return $saved_rec;
 }
 
 =item generate_zs()
@@ -448,18 +452,18 @@ sub generate_zs {
   my($saved_rec, $saved_pers) = (0,0);
   my $chunk_size =  $config->person_chunk_size;
   my $verbose = $self->verbose;
-  my($pt_qry, $chunk);
+  my($chunk);
 
   $self->remark("Finding patients with measurements") if $verbose;
   return unless $self->_get_person_qry;
 
   $self->remark("Starting computation") if $verbose;
-  while ($chunk = $src->fetch_chunk($pt_qry, $chunk_size) and @$chunk) {
-    my $ct = $self->process_person_chunk($chunk);
-    $saved_rec += $ct;
-    $saved_pers += scalar @$chunk;
+  while ($chunk = $self->get_person_chunk and @$chunk) {
+    my($rec_ct, $pers_ct) = $self->process_person_chunk($chunk);
+    $saved_rec += $rec_ct;
+    $saved_pers += $pers_ct;
     $self->remark([ 'Completed %d persons/%d records (total %d/%d)',
-		    scalar @$chunk, $ct, $saved_pers, $saved_rec ])
+		    $pers_ct, $rec_ct, $saved_pers, $saved_rec ])
       if $self->verbose;
   }
 
