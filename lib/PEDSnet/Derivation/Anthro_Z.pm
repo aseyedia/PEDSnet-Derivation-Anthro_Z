@@ -481,8 +481,6 @@ sub generate_zs {
 
 __END__
 
-__END__
-
 =back
 
 =head1 BUGS AND CAVEATS
