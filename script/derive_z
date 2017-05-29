@@ -71,7 +71,7 @@ sub _setup_config {
   PEDSnet::Derivation::Anthro_Z::Config->
       new(config_stems => [ @$stems,
 			    path($0)->basename(qr/\.[^.]*$/),
-			    'bmi' ],
+			    'anthro_z' ],
 	  (defined $section ? (config_section => $section) : ())
 	 );
 }
@@ -123,7 +123,7 @@ sub _run {
 	config => $conf,
 	verbose => $opts->{verbose} // $conf->config_datum('verbose') // 1);
 
-  my($values, $persons) = $driver->generate_bmis;
+  my($values, $persons) = $driver->generate_zs;
 
   $driver->remark({ level => 1,
 		    message => [ 'Saved %d Z scores for %d persons',
