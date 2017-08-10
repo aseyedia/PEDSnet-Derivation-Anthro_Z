@@ -21,6 +21,9 @@ my %module_build_args = (
   "dist_version" => "0.04",
   "license" => "open_source",
   "module_name" => "PEDSnet::Derivation::Anthro_Z",
+  "recommends" => {
+    "Medical::Growth::NHANES_2000" => 0
+  },
   "recursive_test_files" => 1,
   "requires" => {
     "Getopt::Long" => 0,
@@ -44,10 +47,12 @@ my %module_build_args = (
     "script/derive_z"
   ],
   "test_requires" => {
+    "Config::General" => 0,
     "DBD::SQLite" => 0,
     "ExtUtils::MakeMaker" => 0,
     "File::Spec" => 0,
     "FindBin" => 0,
+    "Medical::Growth::NHANES_2000" => 0,
     "PEDSnet::Derivation::Backend::CSV" => 0,
     "Rose::DB" => 0,
     "Test::Differences" => 0,
@@ -58,10 +63,12 @@ my %module_build_args = (
 
 
 my %fallback_build_requires = (
+  "Config::General" => 0,
   "DBD::SQLite" => 0,
   "ExtUtils::MakeMaker" => 0,
   "File::Spec" => 0,
   "FindBin" => 0,
+  "Medical::Growth::NHANES_2000" => 0,
   "Module::Build" => "0.28",
   "PEDSnet::Derivation::Backend::CSV" => 0,
   "Rose::DB" => 0,
