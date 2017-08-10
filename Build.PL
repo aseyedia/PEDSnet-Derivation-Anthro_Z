@@ -18,7 +18,7 @@ my %module_build_args = (
     "Charles Bailey <cbail\@cpan.org>"
   ],
   "dist_name" => "PEDSnet-Derivation-Anthro_Z",
-  "dist_version" => "0.04",
+  "dist_version" => "0.05",
   "license" => "open_source",
   "module_name" => "PEDSnet::Derivation::Anthro_Z",
   "recommends" => {

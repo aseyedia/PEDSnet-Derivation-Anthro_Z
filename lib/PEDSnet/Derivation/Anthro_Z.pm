@@ -6,7 +6,7 @@ use warnings;
 
 package PEDSnet::Derivation::Anthro_Z;
 
-our($VERSION) = '0.04';
+our($VERSION) = '0.05';
 
 use Moo 2;
 
@@ -187,8 +187,7 @@ sub z_meas_for_person {
 	$z_rec->{measurement_source_value} =
 	  "PEDSnet NHANES 2000 Z score computation v$VERSION";
 	$z_rec->{measurement_source_concept_id} = 0;
-	$z_rec->{value_source_value} =
-	  "person: $person->{person_id}, measurement: $m->{measurement_id}";
+	$z_rec->{value_source_value} = "measurement: $m->{measurement_id}";
 	push @z_scores, $z_rec;
       }
       else {
@@ -206,8 +205,7 @@ sub z_meas_for_person {
 	   measurement_source_value =>
 	     "PEDSnet NHANES 2000 Z score computation v$VERSION",
 	   measurement_source_concept_id => 0,
-	   value_source_value =>
-	     "person: $person->{person_id}, measurement: $m->{measurement_id}"
+	   value_source_value => "measurement: $m->{measurement_id}"
 	};
 	# Optional keys - should be there but may be skipped if input
 	# was not read from measurement table

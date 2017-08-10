@@ -80,7 +80,7 @@ my $output = [
 	       measurement_source_value =>
 	       'PEDSnet NHANES 2000 Z score computation v' .
 	         $PEDSnet::Derivation::Anthro_Z::VERSION,
-	       value_source_value => 'person: 1, measurement: 1'
+	       value_source_value => 'measurement: 1'
 	      },
 	      {
 	       person_id => 1,
@@ -98,7 +98,7 @@ my $output = [
 	       measurement_source_value =>
 	       'PEDSnet NHANES 2000 Z score computation v' .
 	         $PEDSnet::Derivation::Anthro_Z::VERSION,
-	       value_source_value => 'person: 1, measurement: 2'
+	       value_source_value => 'measurement: 2'
 	      },
 	      {
 	       person_id => 1,
@@ -116,7 +116,7 @@ my $output = [
 	       measurement_source_value =>
 	       'PEDSnet NHANES 2000 Z score computation v' .
 	         $PEDSnet::Derivation::Anthro_Z::VERSION,
-	       value_source_value => 'person: 1, measurement: 3'
+	       value_source_value => 'measurement: 3'
 	      },
 	     ];
 
@@ -179,7 +179,7 @@ is_deeply( $z_scores,
 	      measurement_source_value =>
 	       'PEDSnet NHANES 2000 Z score computation v' .
 	         $PEDSnet::Derivation::Anthro_Z::VERSION,
-	      value_source_value => 'person: 1, measurement: 4',
+	      value_source_value => 'measurement: 4',
 	     },
 	     {
 	      person_id => 1,
@@ -197,7 +197,7 @@ is_deeply( $z_scores,
 	      measurement_source_value =>
 	       'PEDSnet NHANES 2000 Z score computation v' .
 	         $PEDSnet::Derivation::Anthro_Z::VERSION,
-	      value_source_value => 'person: 1, measurement: 6',
+	      value_source_value => 'measurement: 6',
 	      other_attr => 'Also present'
 	   }],
 	   'Cloned Z score record'
