@@ -1,4 +1,4 @@
-care_site_id,gender_concept_id,person_id,time_of_birth,gender_concept_name
+care_site_id,gender_concept_id,person_id,birth_datetime,gender_concept_name
 1,8507,20,2004-01-25 00:00:00,MALE
 2,8532,12,2002-09-27 00:00:00,FEMALE
 3,8532,54,2008-08-04 00:00:00,FEMALE

@@ -331,7 +331,7 @@ sub build_person_finder_sql {
   # DBD::CSV has a hard time with explicit 3-table join
   # N.B. SQL::Statement requires capitalzation below
   if ($self->sql_flavor eq 'limited') {
-    return q[select distinct p.person_id, p.time_of_birth,
+    return q[select distinct p.person_id, p.birth_datetime,
                              c.concept_name as gender_name
              from ] . $self->input_person_table . q[ as p,
                ] . $self->input_measurement_table . q[ as m,
@@ -343,7 +343,7 @@ sub build_person_finder_sql {
 		      $self->concept_id_map->@*) . q[)];
   }
   else {
-    return q[select distinct p.person_id, p.time_of_birth,
+    return q[select distinct p.person_id, p.birth_datetime,
                             c.concept_name as gender_name
              from ] . $self->input_measurement_table . q[ m
              inner join ] . $self->input_person_table .

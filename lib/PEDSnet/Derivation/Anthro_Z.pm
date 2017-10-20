@@ -6,7 +6,7 @@ use warnings;
 
 package PEDSnet::Derivation::Anthro_Z;
 
-our($VERSION) = '0.05';
+our($VERSION) = '0.10';
 
 use Moo 2;
 
@@ -30,7 +30,7 @@ PEDSnet::Derivation::Anthro_Z - Compute Z scores using Medical::Growth systems
 
 L<PEDSnet::Derivation::Anthro_Z> computes Z scores using measurement
 systems based on L<Medical::Growth>.  Generally, one new measurement
-record is created for each elibible input measurement.  Nearly all
+record is created for each eligible input measurement.  Nearly all
 other specifics are determined by settings in
 L<PEDSnet::Derivation::Anthro_Z::Config>, or the implementation of the
 L<Medical::Growth> system used.
@@ -100,10 +100,10 @@ computation.
 
 The hash reference to which I<$person_rec> points must at least
 contain C<person_id>, and the person's date of birth, as one of
-C<dt_of_birth> (a L<DateTime>), C<time_of_birth> (a string parseable
+C<birth_dt> (a L<DateTime>), C<birth_datetime> (a string parseable
 by L<Rose::DateTime::Util/parse_date>), or the base OMOP
 C<year_of_birth>, C<month_of_birth>, and C<day_of_birth> numeric
-values.  If C<dt_of_birth> wasn't already present, it will be added to
+values.  If C<birth_dt> wasn't already present, it will be added to
 I<$person_rec> for efficienct on subsequent calls.
 
 The I<$meas_list> argument must be an array reference, pointing to a
@@ -136,12 +136,12 @@ sub z_meas_for_person {
 
   @clone_except = $conf->clone_attributes_except->@* if $clone;
 
-  $person->{dt_of_birth} //=
-    parse_date($person->{time_of_birth} //
+  $person->{birth_dt} //=
+    parse_date($person->{birth_datetime} //
 	       join('-', map { $person->{$_} } qw/ year_of_birth
 						   month_of_birth
 						   day_of_birth /))
-    unless exists $person->{dt_of_birth};
+    unless exists $person->{birth_dt};
 
   foreach my $pair ($cid_map->@*) {
     my $meas_cid = $pair->{measurement_concept_id};
@@ -153,14 +153,14 @@ sub z_meas_for_person {
       next unless $m->{value_as_number};
       
       $m->{measurement_dt} =
-	parse_date($m->{measurement_time} // $m->{measurement_date})
+	parse_date($m->{measurement_datetime} // $m->{measurement_date})
 	unless exists $m->{measurement_dt};
 
       if (exists $z_info->{z_check_callback}) {
 	next unless $z_info->{z_check_callback}->($person, $m, $pair);
       }
 
-      my %age = $m->{measurement_dt}->delta_md($person->{dt_of_birth})->deltas;
+      my %age = $m->{measurement_dt}->delta_md($person->{birth_dt})->deltas;
       my $age_mo = $age{months} + $age{days} / 31;
       my $z_val = $self->compute_z({ system => $z_info->{z_class_system},
 				     measure => $z_info->{z_class_measure},
@@ -170,7 +170,7 @@ sub z_meas_for_person {
 				   $m->{value_as_number}, [ $age_mo ]);
       $self->remark( sprintf 'Computed %s Z score %4.2f for meas %d on %s',
 		     $z_info->{z_class_measure}, $z_val,
-		     $m->{measurement_id}, $m->{measurement_time})
+		     $m->{measurement_id}, $m->{measurement_datetime})
 	if $verbose >= 3;
 
       next if !defined($z_val) or $z_val =~ /Inf/;
@@ -196,7 +196,7 @@ sub z_meas_for_person {
 	   person_id => $m->{person_id},
 	   measurement_concept_id => $z_info->{z_measurement_concept_id},
 	   measurement_date => $m->{measurement_date},
-	   measurement_time => $m->{measurement_time},
+	   measurement_datetime => $m->{measurement_datetime},
 	   measurement_type_concept_id => $z_type_cid,
 	   value_as_number => $z_val,
 	   operator_concept_id => $m->{operator_concept_id} || 4172703,
@@ -209,7 +209,7 @@ sub z_meas_for_person {
 	};
 	# Optional keys - should be there but may be skipped if input
 	# was not read from measurement table
-	foreach my $k (qw/ measurement_result_date measurement_result_time
+	foreach my $k (qw/ measurement_result_date measurement_result_datetime
 			   provider_id visit_occurrence_id site /) {
 	  $z_rec->{$k} = $m->{$k} if exists $m->{$k};
 	}

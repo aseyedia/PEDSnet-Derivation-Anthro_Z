@@ -50,7 +50,7 @@ if ($has_sqlite) {
 
   my $got_sql = lc $handle->config->person_finder_sql =~ s/\s+|\n//gr;
   my $want_sql = lc
-    q[select distinct p.person_id, p.time_of_birth,
+    q[select distinct p.person_id, p.birth_datetime,
                          c.concept_name as gender_name
       from person_list_input m
       inner join person_demo p on p.person_id = m.person_id
@@ -63,7 +63,7 @@ if ($has_sqlite) {
   is(scalar @$plist, 3, 'Patient count');
   is_deeply( [ grep { $_->{person_id} == 2 } @$plist ],
 	     [ { person_id => 2,
-	       time_of_birth => '2000-06-18T00:00:00',
+	       birth_datetime => '2000-06-18T00:00:00',
 	       gender_name => 'MALE' } ],
 	     'Result contents');
 
@@ -74,7 +74,7 @@ if ($has_sqlite) {
 
   $got_sql = lc $config->person_finder_sql =~ s/\s+|\n//gr;
   $want_sql = lc
-    q[select distinct p.person_id, p.time_of_birth,
+    q[select distinct p.person_id, p.birth_datetime,
                          c.concept_name as gender_name
       from person as p, measurement as m, concept as c
       where p.person_id = m.person_id 

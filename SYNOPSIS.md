@@ -49,10 +49,10 @@ similar mechanism.  If not, the application code will need to do so.
 
     The hash reference to which _$person\_rec_ points must at least
     contain `person_id`, and the person's date of birth, as one of
-    `dt_of_birth` (a [DateTime](https://metacpan.org/pod/DateTime)), `time_of_birth` (a string parseable
+    `birth_dt` (a [DateTime](https://metacpan.org/pod/DateTime)), `birth_datetime` (a string parseable
     by ["parse\_date" in Rose::DateTime::Util](https://metacpan.org/pod/Rose::DateTime::Util#parse_date)), or the base OMOP
     `year_of_birth`, `month_of_birth`, and `day_of_birth` numeric
-    values.  If `dt_of_birth` wasn't already present, it will be added to
+    values.  If `birth_dt` wasn't already present, it will be added to
     _$person\_rec_ for efficienct on subsequent calls.
 
     The _$meas\_list_ argument must be an array reference, pointing to a
