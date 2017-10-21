@@ -6,7 +6,7 @@ PEDSnet::Derivation::Anthro\_Z - Compute Z scores using Medical::Growth systems
 
 [PEDSnet::Derivation::Anthro\_Z](https://metacpan.org/pod/PEDSnet::Derivation::Anthro_Z) computes Z scores using measurement
 systems based on [Medical::Growth](https://metacpan.org/pod/Medical::Growth).  Generally, one new measurement
-record is created for each elibible input measurement.  Nearly all
+record is created for each eligible input measurement.  Nearly all
 other specifics are determined by settings in
 [PEDSnet::Derivation::Anthro\_Z::Config](https://metacpan.org/pod/PEDSnet::Derivation::Anthro_Z::Config), or the implementation of the
 [Medical::Growth](https://metacpan.org/pod/Medical::Growth) system used.
