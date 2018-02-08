@@ -6,7 +6,7 @@ use warnings;
 
 package PEDSnet::Derivation::Anthro_Z;
 
-our($VERSION) = '0.10';
+our($VERSION) = '0.11';
 
 use Moo 2;
 
