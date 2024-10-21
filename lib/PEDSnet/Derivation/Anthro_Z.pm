@@ -235,17 +235,17 @@ L<PEDSnet::Derivation::Anthro_Z/concept_id_map>.
 
 =cut
 
-sub get_meas_for_person_qry {
-  my $self = shift;
-  my $config = $self->config;
-  
-  $self->src_backend->
-    get_query(q[SELECT * FROM ] . $config->input_measurement_table .
-              q[ WHERE measurement_concept_id IN (] .
-	      join(', ', map { $_->{measurement_concept_id} }
-		   $config->concept_id_map->@*) . q[)
-              AND person_id = ?]);
-}
+   sub get_meas_for_person_qry {
+     my ($self, $person_ids) = @_;
+     my $config = $self->config;
+     my $placeholders = join(',', ('?') x @$person_ids);
+     my $sql = q[
+       SELECT * FROM ] . $config->input_measurement_table . q[
+       WHERE measurement_concept_id IN (] . join(', ', map { $_->{measurement_concept_id} } $config->concept_id_map->@*) . q[)
+       AND person_id IN (] . $placeholders . q[)
+     ];
+     return $self->src_backend->build_query($sql);
+   }
 
 =item save_meas_qry($rows_to_save)
 
@@ -407,30 +407,35 @@ persons having at least one Z score record saved.
 =cut
 
 # TODO: Refactor out into base class
-sub process_person_chunk {
-  my( $self, $person_list ) = @_;
-  my $get_qry = $self->get_meas_for_person_qry;
-  my $src = $self->src_backend;
-  my $saved_rec = 0;
-  my(%saved_pers);
+   sub process_person_chunk {
+     my( $self, $person_list ) = @_;
+     my $person_ids = [ map { $_->{person_id} } @$person_list ];
+     my $get_qry = $self->get_meas_for_person_qry($person_ids);
+     my $src = $self->src_backend;
+     my $saved_rec = 0;
+     my(%saved_pers);
 
-  foreach my $p ($person_list->@*) {
-    next unless $src->execute($get_qry, [ $p->{person_id} ]);
-    my(@anthro);
+     # Execute the query once for all persons
+     $src->execute($get_qry, $person_ids);
 
-    # Wrap into one go, since rare for a single patient to have a huge
-    # number of input measurements
-    while (my @rows = $src->fetch_chunk($get_qry)->@*) { push @anthro, @rows }
-    
-    if (my $zs = $self->z_meas_for_person($p, \@anthro)) {
-      $saved_pers{ $p->{person_id} }++;
-      $saved_rec += $self->_save_zs($zs);
-    }
-  }
+     # Fetch all measurements
+     my %measurements_by_person;
+     while (my @rows = $src->fetch_chunk($get_qry)->@*) {
+       push @{ $measurements_by_person{ $_->{person_id} } }, $_ for @rows;
+     }
 
-  return ($saved_rec, scalar keys %saved_pers) if wantarray;
-  return $saved_rec;
-}
+     # Process each person's measurements
+     foreach my $p (@$person_list) {
+       my $anthro = $measurements_by_person{ $p->{person_id} } || [];
+       if (my $zs = $self->z_meas_for_person($p, $anthro)) {
+         $saved_pers{ $p->{person_id} }++;
+         $saved_rec += $self->_save_zs($zs);
+       }
+     }
+
+     return ($saved_rec, scalar keys %saved_pers) if wantarray;
+     return $saved_rec;
+   }
 
 =item generate_zs()
 
